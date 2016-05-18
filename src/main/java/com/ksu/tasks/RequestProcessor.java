@@ -1,18 +1,15 @@
 package com.ksu.tasks;
 
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
 public class RequestProcessor implements Runnable {
 
     private static final String WEBAPP_DIRECTORY = "webapps";
-    private static final String NOT_FOUND_RESPONSE = "HTTP/1.1 404 Not Found\n";
     private Socket socket;
 
     public RequestProcessor(Socket socket) throws IOException {
@@ -23,7 +20,13 @@ public class RequestProcessor implements Runnable {
         try {
             Request request = parseRequest(socket.getInputStream());
             request.getMethod();
+            File file = new File(WEBAPP_DIRECTORY + request.getUrl());
+            if (!file.exists()) {
+                writeNotFound(socket.getOutputStream());
+            } else {
+                String contentType = Files.probeContentType(file.toPath());
 
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -31,7 +34,7 @@ public class RequestProcessor implements Runnable {
 
     private Request parseRequest(InputStream is) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(is));
-        List<String> requestBody = new ArrayList<String>(10);
+        List<String> requestBody = new ArrayList<>(10);
         while (true) {
             String s = br.readLine();
             requestBody.add(s);
@@ -45,5 +48,24 @@ public class RequestProcessor implements Runnable {
         request.setUrl(head[1]);
         return request;
     }
+
+    private void writeNotFound(OutputStream os) throws IOException {
+        String response = "HTTP/1.1 404 Not Found\r\n";
+        os.write(response.getBytes());
+        os.flush();
+    }
+
+    private void writeOk(OutputStream os, String s) throws Throwable {
+        String response = "HTTP/1.1 200 OK\r\n" +
+                "Server: YarServer/2009-09-09\r\n" +
+                "Content-Type: text/html\r\n" +
+                "Content-Length: " + s.length() + "\r\n" +
+                "Connection: close\r\n\r\n";
+        String result = response + s;
+        os.write(result.getBytes());
+        os.flush();
+    }
+
+
 
 }
